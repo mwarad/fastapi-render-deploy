@@ -3,8 +3,8 @@ Fraud Detection API - Production Ready for Render.com
 """
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import List, Optional
 import joblib
 import json
 import numpy as np
@@ -59,15 +59,92 @@ except Exception as e:
 # REQUEST/RESPONSE MODELS
 # ============================================================
 class TransactionInput(BaseModel):
-    category: str
-    amount: float
-    age_at_transaction: float
-    days_until_card_expires: float
-    loc_delta: float = 0.0
-    trans_volume_mavg: float
-    trans_volume_mstd: float = 0.0
-    trans_freq: float = 1.0
-    loc_delta_mavg: float = 0.0
+    """
+    Pydantic model for transaction input with validation.
+    
+    Demonstrates:
+    - Field() with constraints (ge, le, description)
+    - field_validator for custom validation
+    - model_validator for cross-field validation
+    """
+    
+    # Field with description and constraints
+    category: str = Field(
+        ...,  # Required field
+        description="Transaction category (e.g., Grocery, Electronics)",
+        examples=["Grocery", "Electronics", "Clothing"]
+    )
+    
+    amount: float = Field(
+        ...,
+        ge=0.01,  # Greater than or equal to 0.01
+        le=50000,  # Less than or equal to 50000
+        description="Transaction amount in dollars"
+    )
+    
+    age_at_transaction: float = Field(
+        ...,
+        ge=18,
+        le=100,
+        description="Customer age at time of transaction"
+    )
+    
+    days_until_card_expires: float = Field(
+        ...,
+        ge=0,
+        le=3650,  # Max 10 years
+        description="Days until card expiration"
+    )
+    
+    loc_delta: float = Field(
+        default=0.0,
+        ge=0,
+        le=1,
+        description="Haversine distance from previous transaction (normalized 0-1)"
+    )
+    
+    trans_volume_mavg: float = Field(
+        ...,
+        ge=0,
+        description="4-hour moving average of transaction amounts"
+    )
+    
+    trans_volume_mstd: float = Field(
+        default=0.0,
+        ge=0,
+        description="4-hour standard deviation of transaction amounts"
+    )
+    
+    trans_freq: float = Field(
+        default=1.0,
+        ge=1,
+        description="Transaction frequency in 4-hour window"
+    )
+    
+    loc_delta_mavg: float = Field(
+        default=0.0,
+        ge=0,
+        le=1,
+        description="4-hour moving average of location changes"
+    )
+    
+    # Custom validator for category
+    @field_validator('category')
+    @classmethod
+    def validate_category(cls, v):
+        """Validate category is not empty and properly formatted."""
+        if not v or not v.strip():
+            raise ValueError('Category cannot be empty')
+        return v.strip()
+    
+    # Cross-field validation
+    @model_validator(mode='after')
+    def validate_transaction(self):
+        """Cross-field validation: high amount + high location delta = suspicious."""
+        if self.amount > 5000 and self.loc_delta > 0.5:
+            # Just a warning - we still process but log it
+            print(f"WARNING: High-risk pattern detected: amount=${self.amount}, loc_delta={self.loc_delta}")
+        return self
     
     class Config:
         json_schema_extra = {
