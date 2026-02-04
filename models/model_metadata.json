@@ -1,0 +1,46 @@
+{
+  "features": [
+    "category_encoded",
+    "amount",
+    "age_at_transaction",
+    "days_until_card_expires",
+    "loc_delta",
+    "trans_volume_mavg",
+    "trans_volume_mstd",
+    "trans_freq",
+    "loc_delta_mavg"
+  ],
+  "category_classes": [
+    "Cash Withdrawal",
+    "Clothing",
+    "Domestic Transport",
+    "Electronics",
+    "Grocery",
+    "Health/Beauty",
+    "Holliday/Travel",
+    "Jewelery",
+    "Restaurant/Cafeteria",
+    "Sports/Outdoors"
+  ],
+  "metrics": {
+    "xgboost": {
+      "accuracy": 0.996934540652707,
+      "f1": 0.3925233644859813,
+      "precision": 0.27631578947368424,
+      "recall": 0.6774193548387096,
+      "roc_auc": 0.9728869543225319
+    },
+    "random_forest": {
+      "accuracy": 0.9978777589134126,
+      "f1": 0.43037974683544306,
+      "precision": 0.3541666666666667,
+      "recall": 0.5483870967741935,
+      "roc_auc": 0.947108535977805
+    },
+    "ensemble": {
+      "accuracy": 0.9978777589134126,
+      "f1": 0.4578313253012048,
+      "roc_auc": 0.9612242006328814
+    }
+  }
+}
