@@ -1,5 +1,6 @@
 """
 Fraud Detection API - Production Ready for Render.com
+With Inference Logging for Monitoring
 """
 
 from fastapi import FastAPI, HTTPException
@@ -12,6 +13,31 @@ import pandas as pd
 from datetime import datetime
 import os
 from pathlib import Path
+import logging
+
+# ============================================================
+# LOGGING SETUP
+# ============================================================
+LOG_DIR = Path("logs")
+LOG_DIR.mkdir(exist_ok=True)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_DIR / "inference.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Separate logger for predictions (structured JSONL for analysis)
+prediction_logger = logging.getLogger("predictions")
+prediction_handler = logging.FileHandler(LOG_DIR / "predictions.jsonl")
+prediction_handler.setFormatter(logging.Formatter('%(message)s'))
+prediction_logger.addHandler(prediction_handler)
+prediction_logger.setLevel(logging.INFO)
 
 # ============================================================
 # FASTAPI APP
@@ -19,7 +45,7 @@ from pathlib import Path
 app = FastAPI(
     title="Fraud Detection API",
     description="Ensemble fraud detection using XGBoost + Random Forest Pipelines",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 # ============================================================
@@ -273,6 +299,23 @@ def predict(transaction: TransactionInput):
         else:
             verdict = "LEGITIMATE - Approved"
         
+        # LOG PREDICTION (for monitoring dashboard)
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "transaction_id": request_id,
+            "input": transaction.model_dump(),
+            "predictions": {
+                "xgboost": {"prob": round(xgb_prob, 4)},
+                "random_forest": {"prob": round(rf_prob, 4)},
+                "ensemble": {"prob": round(ensemble_prob, 4), "pred": ensemble_pred}
+            },
+            "verdict": verdict,
+            "has_drift": len(drift_warnings) > 0,
+            "drift_warnings": drift_warnings
+        }
+        prediction_logger.info(json.dumps(log_entry))
+        logger.info(f"[{request_id}] Prediction: {verdict} (prob={ensemble_prob:.3f})")
+        
         return PredictionResponse(
             transaction_id=request_id,
             timestamp=datetime.utcnow().isoformat(),
@@ -285,4 +328,45 @@ def predict(transaction: TransactionInput):
         )
         
     except Exception as e:
+        logger.error(f"[{request_id}] Prediction error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/logs/summary")
+def get_log_summary():
+    """Get summary of logged predictions for monitoring dashboard."""
+    log_file = LOG_DIR / "predictions.jsonl"
+    
+    if not log_file.exists():
+        return {
+            "total_predictions": 0,
+            "fraud_predictions": 0,
+            "fraud_rate": 0,
+            "predictions_with_drift": 0,
+            "drift_rate": 0,
+            "message": "No predictions logged yet"
+        }
+    
+    total = 0
+    fraud_count = 0
+    drift_count = 0
+    
+    with open(log_file) as f:
+        for line in f:
+            try:
+                entry = json.loads(line)
+                total += 1
+                if entry["predictions"]["ensemble"]["pred"] == 1:
+                    fraud_count += 1
+                if entry.get("has_drift", False):
+                    drift_count += 1
+            except:
+                continue
+    
+    return {
+        "total_predictions": total,
+        "fraud_predictions": fraud_count,
+        "fraud_rate": round(fraud_count / total * 100, 2) if total > 0 else 0,
+        "predictions_with_drift": drift_count,
+        "drift_rate": round(drift_count / total * 100, 2) if total > 0 else 0
+    }
