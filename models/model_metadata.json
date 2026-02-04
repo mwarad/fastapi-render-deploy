@@ -1,6 +1,17 @@
 {
-  "features": [
-    "category_encoded",
+  "feature_columns": [
+    "category",
+    "amount",
+    "age_at_transaction",
+    "days_until_card_expires",
+    "loc_delta",
+    "trans_volume_mavg",
+    "trans_volume_mstd",
+    "trans_freq",
+    "loc_delta_mavg"
+  ],
+  "categorical_columns": ["category"],
+  "numeric_columns": [
     "amount",
     "age_at_transaction",
     "days_until_card_expires",
@@ -22,6 +33,9 @@
     "Restaurant/Cafeteria",
     "Sports/Outdoors"
   ],
+  "training_samples": 145457,
+  "test_samples": 36365,
+  "pipeline_steps": ["OrdinalEncoder", "XGBoost/RandomForest"],
   "metrics": {
     "xgboost": {
       "accuracy": 0.996934540652707,
@@ -40,6 +54,8 @@
     "ensemble": {
       "accuracy": 0.9978777589134126,
       "f1": 0.4578313253012048,
+      "precision": 0.32,
+      "recall": 0.61,
       "roc_auc": 0.9612242006328814
     }
   }

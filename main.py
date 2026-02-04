@@ -144,7 +144,12 @@ def model_info():
     """Get model metadata."""
     return {
         "feature_columns": FEATURE_COLS,
+        "categorical_columns": metadata.get("categorical_columns", ["category"]),
+        "numeric_columns": metadata.get("numeric_columns", FEATURE_COLS[1:]),
         "category_classes": CATEGORY_CLASSES,
+        "training_samples": metadata.get("training_samples", 145457),
+        "test_samples": metadata.get("test_samples", 36365),
+        "pipeline_steps": metadata.get("pipeline_steps", ["OrdinalEncoder", "Classifier"]),
         "metrics": metadata.get("metrics", {})
     }
 
